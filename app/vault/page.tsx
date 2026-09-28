@@ -14,11 +14,9 @@ export default function VaultPage() {
   
   const [isDrafting, setIsDrafting] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
-  const [draftMediaFile, setDraftMediaFile] = useState<File | null>(null);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [entries, setEntries] = useState<VaultEntry[]>([]);
   const editorRef = useRef<HTMLDivElement>(null);
-  const draftMediaInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const capId = localStorage.getItem("anchor_capsule");
@@ -47,45 +45,22 @@ export default function VaultPage() {
   const handleSeal = async () => {
     if (!editorRef.current) return;
     const content = editorRef.current.innerHTML;
-    if (!draftTitle.trim() && !draftMediaFile && !content.trim()) {
-      alert("Please provide a title, content, or attach media to seal an entry.");
+    if (!draftTitle.trim() && !content.trim()) {
+      alert("Please provide a title or content to seal an entry.");
       return;
-    }
-
-    let mediaType: "image" | "video" | "audio" | undefined = undefined;
-    let mediaUrl: string | undefined = undefined;
-
-    if (draftMediaFile) {
-      if (draftMediaFile.size > 900 * 1024) {
-        alert("Files must be under 900KB (small images) to fit directly in the database since Storage was skipped.");
-        return;
-      }
-      
-      if (draftMediaFile.type.startsWith("video/")) mediaType = "video";
-      else if (draftMediaFile.type.startsWith("audio/")) mediaType = "audio";
-      else mediaType = "image";
-
-      const url = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(draftMediaFile);
-      });
-      mediaUrl = url;
     }
 
     if (editingEntryId) {
       const dbIndex = entries.findIndex(e => e.id === editingEntryId);
       if (dbIndex !== -1) {
         const e = entries[dbIndex];
-        const updated = { ...e, title: draftTitle || "Untitled Entry", content, mediaUrl: mediaUrl || e.mediaUrl, mediaType: mediaType || e.mediaType };
+        const updated = { ...e, title: draftTitle || "Untitled Entry", content };
         await db.addVaultEntry(capsuleId, updated);
       }
     } else {
       await db.addVaultEntry(capsuleId, {
-        title: draftTitle || draftMediaFile?.name || "Untitled Entry",
+        title: draftTitle || "Untitled Entry",
         content,
-        mediaUrl,
-        mediaType,
         author: currentUser
       });
     }
@@ -93,7 +68,6 @@ export default function VaultPage() {
     setIsDrafting(false);
     setEditingEntryId(null);
     setDraftTitle("");
-    setDraftMediaFile(null);
   };
 
   const [readingEntry, setReadingEntry] = useState<VaultEntry | null>(null);
@@ -127,36 +101,7 @@ export default function VaultPage() {
     setReadingEntry(null);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
 
-    if (file.size > 900 * 1024) {
-      alert("Since you skipped Firebase Storage, files must be under 900KB (small images) to fit directly inside the database.");
-      return;
-    }
-
-    let mediaType: "image" | "video" | "audio" = "image";
-    if (file.type.startsWith("video/")) mediaType = "video";
-    if (file.type.startsWith("audio/")) mediaType = "audio";
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const url = reader.result as string;
-      await db.addVaultEntry(capsuleId, {
-        title: file.name,
-        content: "",
-        mediaUrl: url,
-        mediaType: mediaType,
-        author: currentUser
-      });
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    };
-    reader.readAsDataURL(file);
-  };
 
   if (loading) return <div className="min-h-[100dvh] bg-[#11130e]" />;
 
@@ -227,36 +172,22 @@ export default function VaultPage() {
       {/* VAULT DASHBOARD */}
       {!isDrafting && !readingEntry && (
         <main className="relative z-10 flex-1 w-full max-w-5xl mx-auto p-8 md:p-16 flex flex-col">
-          <div className="flex justify-between items-end mb-16 border-b border-[#3a3e30]/50 pb-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-16 border-b border-[#3a3e30]/50 pb-8">
             <div>
-              <h1 className="font-serif text-4xl font-light text-white mb-2">Cryptographic Vault</h1>
-              <p className="font-sans text-xs uppercase tracking-[0.2em] text-[#6b705c]">Window opens annually on Nov 23</p>
+              <h1 className="font-serif text-3xl md:text-4xl font-light text-white mb-2">Cryptographic Vault</h1>
+              <p className="font-sans text-[10px] md:text-xs uppercase tracking-[0.2em] text-[#6b705c]">Window opens annually on Nov 23</p>
             </div>
-            <div className="flex gap-4">
+            <div className="flex w-full md:w-auto gap-4">
               <button 
                 onClick={() => setIsDrafting(true)}
-                className="py-3 px-6 border border-[#5a604a] hover:border-white transition-colors text-xs tracking-[0.2em] uppercase text-white font-sans flex items-center gap-3 bg-[#1a1c15]/50"
+                className="w-full md:w-auto py-3 px-6 border border-[#5a604a] hover:border-white transition-colors text-xs tracking-[0.2em] uppercase text-white font-sans flex items-center justify-center gap-3 bg-[#1a1c15]/50"
               >
                 Draft New Entry
               </button>
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="py-3 px-6 border border-[#3a3e30] hover:border-[#6b705c] transition-colors text-xs tracking-[0.2em] uppercase text-[#8c9475] hover:text-white font-sans flex items-center gap-3 bg-transparent"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                Secure Media
-              </button>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileUpload} 
-                className="hidden" 
-                accept="image/*,video/*,audio/*"
-              />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
             {entries.length === 0 && (
               <p className="font-serif text-[#6b705c] italic col-span-full">The vault is currently empty.</p>
             )}
@@ -338,47 +269,7 @@ export default function VaultPage() {
                 <button onClick={() => execCommand("insertUnorderedList")} className="p-2 hover:bg-[#1a1c15] rounded text-[#8c9475] hover:text-white transition-colors" title="Bullet List"><List className="w-4 h-4" /></button>
               </div>
               
-              <div>
-                <button 
-                  onClick={() => draftMediaInputRef.current?.click()} 
-                  className="p-2 hover:bg-[#1a1c15] rounded text-[#8c9475] hover:text-white transition-colors flex items-center gap-2 text-xs font-sans uppercase tracking-widest"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                  Attach Media
-                </button>
-                <input 
-                  type="file" 
-                  ref={draftMediaInputRef} 
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) setDraftMediaFile(f);
-                  }} 
-                  className="hidden" 
-                  accept="image/*,video/*,audio/*"
-                />
-              </div>
             </div>
-
-            {/* Media Preview inside Draft */}
-            {draftMediaFile && (
-              <div className="mb-8 p-4 border border-[#3a3e30]/50 rounded-sm bg-[#1a1c15]/30 relative flex items-center justify-center">
-                <button 
-                  onClick={() => setDraftMediaFile(null)}
-                  className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-                {draftMediaFile.type.startsWith('image/') && (
-                  <img src={URL.createObjectURL(draftMediaFile)} alt="Preview" className="max-h-[40vh] rounded-sm" />
-                )}
-                {draftMediaFile.type.startsWith('video/') && (
-                  <video src={URL.createObjectURL(draftMediaFile)} controls className="max-h-[40vh] rounded-sm" />
-                )}
-                {draftMediaFile.type.startsWith('audio/') && (
-                  <audio src={URL.createObjectURL(draftMediaFile)} controls className="w-full max-w-md" />
-                )}
-              </div>
-            )}
 
             {/* Notion-style Rich Text Editor */}
             <div 
