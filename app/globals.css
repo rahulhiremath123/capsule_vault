@@ -1,26 +1,84 @@
 @import "tailwindcss";
 
+@theme {
+  --font-serif: var(--font-cormorant), ui-serif, Georgia, serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --color-canvas: #0c0c0c;
+  --color-ink: #e0e0e0;
+  --color-accent: #6b705c; /* Olive accent */
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #0c0c0c;
+  --foreground: #e0e0e0;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+/* Classical geometrical line elements */
+.geometric-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+}
+.geometric-crosshair::after {
+  content: '';
+  position: absolute;
+  top: -50vh;
+  left: 50%;
+  width: 1px;
+  height: 100vh;
+  background: rgba(255, 255, 255, 0.1);
+}
+.geometric-circle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 70vw;
+  height: 70vw;
+  max-width: 800px;
+  max-height: 800px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* Rich Text Editor Formatting */
+[contenteditable]:empty:before {
+  content: attr(placeholder);
+  color: #5a604a;
+  cursor: text;
+}
+[contenteditable] h1 {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  margin-top: 2rem;
+  color: white;
+}
+[contenteditable] h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  margin-top: 1.5rem;
+  color: white;
+}
+[contenteditable] ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+[contenteditable] b, [contenteditable] strong {
+  color: white;
 }
