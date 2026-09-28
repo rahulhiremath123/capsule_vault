@@ -21,20 +21,22 @@ export default function VaultPage() {
   const draftMediaInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const fetchVault = async () => {
-      const capId = localStorage.getItem("anchor_capsule");
-      const user = localStorage.getItem("anchor_user");
-      if (!capId || !user) {
-        router.push("/");
-      } else {
-        setCapsuleId(capId);
-        setCurrentUser(user);
-        const data = await db.getVaultEntries(capId);
-        setEntries(data.reverse());
-        setLoading(false);
-      }
-    };
-    fetchVault();
+    const capId = localStorage.getItem("anchor_capsule");
+    const user = localStorage.getItem("anchor_user");
+    if (!capId || !user) {
+      router.push("/");
+      return;
+    }
+    
+    setCapsuleId(capId);
+    setCurrentUser(user);
+    
+    const unsubscribe = db.subscribeVaultEntries(capId, (data) => {
+      setEntries(data.reverse());
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [router]);
 
   const execCommand = (command: string, value?: string) => {
@@ -72,26 +74,20 @@ export default function VaultPage() {
     }
 
     if (editingEntryId) {
-      const updatedEntries = [...entries];
-      const dbIndex = updatedEntries.findIndex(e => e.id === editingEntryId);
-      
+      const dbIndex = entries.findIndex(e => e.id === editingEntryId);
       if (dbIndex !== -1) {
-        const e = updatedEntries[dbIndex];
+        const e = entries[dbIndex];
         const updated = { ...e, title: draftTitle || "Untitled Entry", content, mediaUrl: mediaUrl || e.mediaUrl, mediaType: mediaType || e.mediaType };
-        
         await db.addVaultEntry(capsuleId, updated);
-        updatedEntries[dbIndex] = updated;
-        setEntries(updatedEntries);
       }
     } else {
-      const newEntry = await db.addVaultEntry(capsuleId, {
+      await db.addVaultEntry(capsuleId, {
         title: draftTitle || draftMediaFile?.name || "Untitled Entry",
         content,
         mediaUrl,
         mediaType,
         author: currentUser
       });
-      setEntries([newEntry, ...entries]);
     }
 
     setIsDrafting(false);
@@ -147,7 +143,7 @@ export default function VaultPage() {
     const reader = new FileReader();
     reader.onload = async () => {
       const url = reader.result as string;
-      const newEntry = await db.addVaultEntry(capsuleId, {
+      await db.addVaultEntry(capsuleId, {
         title: file.name,
         content: "",
         mediaUrl: url,
@@ -155,7 +151,6 @@ export default function VaultPage() {
         author: currentUser
       });
 
-      setEntries([newEntry, ...entries]);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }

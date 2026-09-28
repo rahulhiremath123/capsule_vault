@@ -13,31 +13,32 @@ export default function LogPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchLogs = async () => {
-      const capId = localStorage.getItem("anchor_capsule");
-      const user = localStorage.getItem("anchor_user");
-      if (!capId || !user) {
-        router.push("/");
-      } else {
-        setCapsuleId(capId);
-        setCurrentUser(user);
-        const data = await db.getLogs(capId);
-        setLogs(data.reverse()); // newest first
-        setLoading(false);
-      }
-    };
-    fetchLogs();
+    const capId = localStorage.getItem("anchor_capsule");
+    const user = localStorage.getItem("anchor_user");
+    if (!capId || !user) {
+      router.push("/");
+      return;
+    }
+    
+    setCapsuleId(capId);
+    setCurrentUser(user);
+    
+    const unsubscribe = db.subscribeLogs(capId, (data) => {
+      setLogs(data.reverse());
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [router]);
 
   if (loading) return <div className="min-h-[100dvh] bg-[#11130e]" />;
 
   const handleAddSignal = async () => {
-    const newLog = await db.addLog(capsuleId, {
+    await db.addLog(capsuleId, {
       author: currentUser,
       type: "text",
       content: "Presence acknowledged."
     });
-    setLogs([newLog, ...logs]);
   };
 
   return (

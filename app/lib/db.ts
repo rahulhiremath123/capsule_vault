@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, query, orderBy, updateDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, query, orderBy, updateDoc, onSnapshot } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD2WtQZ5kbdlzWqn0NDQj8mOvJ9OA4X5CQ",
@@ -57,20 +57,19 @@ export const db = {
     }
   },
 
-  getLogs: async (capsuleId: string): Promise<LogEntry[]> => {
-    try {
-      const logsRef = collection(firestore, `capsules/${capsuleId}/logs`);
-      const q = query(logsRef, orderBy("timestamp", "asc"));
-      const snapshot = await getDocs(q);
+  subscribeLogs: (capsuleId: string, callback: (logs: LogEntry[]) => void) => {
+    const logsRef = collection(firestore, `capsules/${capsuleId}/logs`);
+    const q = query(logsRef, orderBy("timestamp", "asc"));
+    return onSnapshot(q, (snapshot) => {
       const logs: LogEntry[] = [];
       snapshot.forEach(doc => {
         logs.push({ id: doc.id, ...doc.data() } as LogEntry);
       });
-      return logs;
-    } catch (e) {
+      callback(logs);
+    }, (e) => {
       console.error(e);
-      return [];
-    }
+      callback([]);
+    });
   },
   
   addLog: async (capsuleId: string, entry: Omit<LogEntry, "id" | "capsuleId" | "timestamp">) => {
@@ -89,36 +88,40 @@ export const db = {
     }
   },
 
-  getVaultEntries: async (capsuleId: string): Promise<VaultEntry[]> => {
-    try {
-      const vaultRef = collection(firestore, `capsules/${capsuleId}/vault`);
-      const q = query(vaultRef, orderBy("timestamp", "asc"));
-      const snapshot = await getDocs(q);
+  subscribeVaultEntries: (capsuleId: string, callback: (entries: VaultEntry[]) => void) => {
+    const vaultRef = collection(firestore, `capsules/${capsuleId}/vault`);
+    const q = query(vaultRef, orderBy("timestamp", "asc"));
+    return onSnapshot(q, (snapshot) => {
       const entries: VaultEntry[] = [];
       snapshot.forEach(doc => {
         entries.push({ id: doc.id, ...doc.data() } as VaultEntry);
       });
-      return entries;
-    } catch (e) {
+      callback(entries);
+    }, (e) => {
       console.error(e);
-      return [];
-    }
+      callback([]);
+    });
   },
 
   addVaultEntry: async (capsuleId: string, entry: Omit<VaultEntry, "id" | "capsuleId" | "timestamp"> | VaultEntry) => {
     try {
       const vaultRef = collection(firestore, `capsules/${capsuleId}/vault`);
       
+      // Remove undefined values since Firebase crashes on them
+      const cleanEntry = Object.fromEntries(
+        Object.entries(entry).filter(([_, v]) => v !== undefined)
+      );
+
       // If updating an existing entry
-      if ("id" in entry) {
-        const docRef = doc(firestore, `capsules/${capsuleId}/vault`, entry.id);
-        await updateDoc(docRef, entry as any);
-        return entry as VaultEntry;
+      if ("id" in cleanEntry) {
+        const docRef = doc(firestore, `capsules/${capsuleId}/vault`, cleanEntry.id as string);
+        await updateDoc(docRef, cleanEntry);
+        return cleanEntry as VaultEntry;
       }
 
       // If creating a new entry
       const newEntry = {
-        ...entry,
+        ...cleanEntry,
         capsuleId,
         timestamp: Date.now()
       };
@@ -126,12 +129,12 @@ export const db = {
       const finalEntry = { id: docRef.id, ...newEntry } as VaultEntry;
 
       // Automatically fire a log pulse
-      const logContent = entry.mediaUrl 
+      const logContent = cleanEntry.mediaUrl 
         ? "A media file was secured in the vault." 
         : "An entry was recorded in the vault.";
         
       await db.addLog(capsuleId, {
-        author: entry.author,
+        author: cleanEntry.author as string,
         type: "text",
         content: logContent
       });
